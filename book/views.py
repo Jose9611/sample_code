@@ -59,9 +59,9 @@ class BookListAPIView(APIView):
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
-            else:
-                data = {"message": "You have no permission"}
-                return Response(data)
+        else:
+            data = {"message": "You have no permission"}
+            return Response(data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
