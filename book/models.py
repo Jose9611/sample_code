@@ -1,44 +1,41 @@
-from django.contrib.auth.models import AbstractUser,Permission
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 
-class CustomUser(AbstractUser):
-    user_type = models.CharField(max_length=30, blank=True)
-    region_id = models.IntegerField(blank=True, default=None, null=True)
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, password, **extra_fields)
+
+class CustomUser(AbstractBaseUser, PermissionsMixin):
+    email = models.EmailField(unique=True)
+    first_name = models.CharField(max_length=30)
+    last_name = models.CharField(max_length=30)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+
+    objects = CustomUserManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['first_name', 'last_name']
+
+class FriendRequest(models.Model):
+
+    requested_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='requested_by_customer', blank=True,
+                                null=True)
+    requested_to = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='requested_to_customer', blank=True,
+                                null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_accepted = models.BooleanField(default=False)
+    is_rejected = models.BooleanField(default=False)
 
 
-class Userpermissions(models.Model):
-    permission = models.ForeignKey(Permission, on_delete=models.CASCADE,  null=True, blank=True)
-    user_type = models.CharField(max_length=30)
-    is_permission = models.BooleanField(default=False)
-
-
-
-class Apartment(models.Model):
-    name = models.CharField(max_length=100)
-    address = models.TextField(max_length=100)
-    description = models.TextField(max_length=100)
-    gst_percent = models.FloatField(blank=True, default=None, null=True)
-
-
-
-class Flat(models.Model):
-    flat_number = models.CharField(max_length=100)
-    address = models.TextField(max_length=100)
-    description = models.TextField(max_length=100)
-    apartment = models.ForeignKey(Apartment, on_delete=models.CASCADE, related_name='flat_apartment', null=True, blank=True)
-
-
-class AssignedApartment(models.Model):
-    apartment = models.ForeignKey(Apartment, on_delete=models.CASCADE, related_name='assigned_apartment', null=True, blank=True)
-    user =models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='assigned', null=True, blank=True)
-    description = models.TextField(max_length=100)
-
-
-class Booking (models.Model):
-    name = models.CharField(max_length=100)
-    user =  models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='user_booking', null=True, blank=True)
-    price = models.FloatField(blank=True, default=None, null=True)
-    gst_amount = models.FloatField(blank=True, default=None, null=True)
-    total = models.FloatField(blank=True, default=None, null=True)
-    flat =  models.ForeignKey(Flat, on_delete=models.CASCADE, related_name='booking_flat', null=True, blank=True)
-    created_on = models.DateTimeField(auto_now_add=True)

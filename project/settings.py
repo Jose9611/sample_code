@@ -79,7 +79,7 @@ AUTH_USER_MODEL = 'book.CustomUser'
 DATABASES = {
     'default': {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "sample_test",
+        "NAME": "sample_db",
         "USER": "postgres",
         "PASSWORD": "postgres",
         "HOST": "localhost",
