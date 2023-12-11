@@ -1,24 +1,40 @@
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .serializers import BookSerializer,UserSerializer
+from .serializers import UserSerializer,UserListSerializer,FriendRequestSerializer,FriendAcceptedlistserializer,FriendPendinglistserializer
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
-from .models import Book
+from .models import CustomUser,FriendRequest
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
+#from .permissions import CustomPermission
+from rest_framework.decorators import api_view, permission_classes
+from project.custom_paginator import CustomPageNumberPagination
+from django.db.models import  Q,Prefetch
+from project.constants import MESSAGES
+from django.utils import timezone
+
+
 
 @api_view(['POST'])
-@csrf_exempt
 def login(request):
-    username = request.data.get('username')
+    email = request.data.get('email')
     password = request.data.get('password')
 
-    user = authenticate(username=username, password=password)
+    # user = authenticate(email=email, password=password)
+    if not CustomUser.objects.filter(email__iexact=email).exists():
+        return Response({'error': 'Email or Password is Incorrect'}, status=400)
+    elif not CustomUser.objects.filter(email__iexact=email,password=password).exists():
+        return Response({'error': 'Invalid password'}, status=400)
+    else:
+        user = CustomUser.objects.filter(email__iexact=email,password=password).first()
+
+
+
 
     if user:
         refresh = RefreshToken.for_user(user)
@@ -26,10 +42,11 @@ def login(request):
             'access': str(refresh.access_token),
             'refresh': str(refresh)
         })
-    else:
-        return Response({'error': 'Invalid credentials'}, status=400)
+
+
 @api_view(['POST','GET'])
 @csrf_exempt
+#@permission_classes([IsAuthenticated,])
 def register_user(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
@@ -38,33 +55,105 @@ def register_user(request):
     else:
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class BookListAPIView(APIView):
+class UserSearchAPIView(APIView):
     permission_classes = [IsAuthenticated]
-    def get(self, request):
-        user = request.user
-        print(user)
-        if user.user_type in ['admin','staff','customer']:
-            books = Book.objects.all()
-            serializer = BookSerializer(books, many=True)
-            return Response(serializer.data)
-        else:
-            data = {"message":"You have no permission"}
-            return Response(data)
-
-
+    pagination_class = CustomPageNumberPagination
     def post(self, request):
         user = request.user
-        serializer = BookSerializer(data=request.data)
-        if user.user_type in ['admin', 'staff']:
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            else:
-                data = {"message": "You have no permission"}
-                return Response(data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        users_list = CustomUser.objects.exclude(id=user.id)
+        if request.data.get('search'):
+            if users_list.filter(email__iexact=request.data.get('search')):
+                user = users_list.filter(email__iexact=request.data.get('search')).first()
+                serializer = UserListSerializer(user)
+                return Response(serializer.data)
+            users_list= users_list.filter(first_name__icontains=request.data.get('search'))
+
+
+        paginator = CustomPageNumberPagination()
+        result_page = paginator.paginate_queryset(users_list, request)
+        serializer = UserListSerializer(result_page, many=True)
+        return Response(serializer.data)
+
+
+class FriendRequestAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        try:
+            res = ''
+
+            user = request.user
+            r_to = request.data.get('requested_to')
+            req_data = {}
+            last_minute = timezone.now() - timezone.timedelta(minutes=1)
+            count_within_minute = FriendRequest.objects.filter(Q(created_at__gte=last_minute)&Q(requested_by_id=user.id)).count()
+            r_user= CustomUser.objects.filter(id=r_to).first()
+            if request.data.get('action') == 'request':
+                if FriendRequest.objects.filter(Q(requested_by_id=user.id)&Q(requested_to_id=r_to)).exists():
+                    return Response({"message":MESSAGES['REQUEST_ALREAADY_EXIST']})
+
+
+                elif  count_within_minute >= 3:
+                    return Response({"message":MESSAGES['REQUEST_EXCEED']})
+                else:
+
+                    req_data['requested_to_id']=r_user.id
+                    req_data['requested_by_id'] = user.id
+                    out =FriendRequest.objects.create(**req_data)
+                    data =FriendRequestSerializer(out).data
+
+                    res ={"data":data,"message":MESSAGES['FRIEND_REQUEST_SUCCESS']}
+            elif request.data.get('action') == 'response':
+                if not FriendRequest.objects.filter(Q(requested_by_id=r_to)&Q(requested_to_id=user.id)& Q(is_rejected=False)& Q(is_accepted=False)).exists():
+                    return Response({"message":MESSAGES['REQUEST_NOT_FOUND']})
+                else:
+                    if request.data.get('is_regected'):
+                        req_data['is_regected'] = True
+
+                    elif request.data.get('is_accepted'):
+                        req_data['is_accepted'] = True
+                    out =FriendRequest.objects.filter(Q(requested_by_id=r_to) & Q(requested_to_id=user.id)).update(**req_data)
+                    res = {"data":"","message":MESSAGES['FRIEND_REQUEST_STATUS_CHANGED']}
+            return Response(res)
+
+        except Exception as ex:
+            response = self.response(status=False, data=[], msg=MESSAGES['FAILED'])
+        return response
+
+class AcceptedListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        try:
+            res = ''
+
+            user = request.user
+            if request.data.get('action') =='accepted':
+                list =FriendRequest.objects.filter(Q(requested_by_id=user.id)&Q(is_accepted=True)).select_related('requested_to')
+                res = FriendAcceptedlistserializer(list, many=True).data
+            elif  request.data.get('action') =='pending':
+                list = FriendRequest.objects.filter(Q(requested_to_id=user.id) & Q(is_accepted=False)).select_related('requested_by')
+                res = FriendPendinglistserializer(list, many=True).data
+
+
+
+            return Response(res)
+
+        except Exception as ex:
+            response = self.response(status=False, data=[], msg=MESSAGES['FAILED'])
+        return response
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+#
