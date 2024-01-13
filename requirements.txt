@@ -3,3 +3,4 @@ Django==3.0.1
 djangorestframework==3.11.0
 rest_framework_simplejwt
 django-redis==4.12.1
+pytest-cov

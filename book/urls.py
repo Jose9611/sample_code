@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import (
 from .views import login,register_user,UserSearchAPIView,FriendRequestAPIView,AcceptedListAPIView
 
 from django.urls import path, re_path
+app_name = 'book'
 urlpatterns = [
     # Obtain JWT token
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

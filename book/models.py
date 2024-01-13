@@ -28,6 +28,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name']
 
+    def __str__(self):
+        return self.email
+
 class FriendRequest(models.Model):
 
     requested_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='requested_by_customer', blank=True,
