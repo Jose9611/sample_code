@@ -12,10 +12,17 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 
 import os
 
+import os
+
+# ...
+
+# Set the STATIC_ROOT directory
+
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
@@ -25,7 +32,7 @@ SECRET_KEY = 'w$g-s(o+cu3haj23$a2y&aboif#pf8p$n0=@^oxr61dm_ji^%r'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -78,12 +85,12 @@ AUTH_USER_MODEL = 'book.CustomUser'
 
 DATABASES = {
     'default': {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "sample_db",
-        "USER": "postgres",
-        "PASSWORD": "postgres",
-        "HOST": "localhost",
-        "PORT": "5432"
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'sample_db',
+        'USER': 'postgres',
+        'PASSWORD': 'postgres',
+        'HOST': 'db',  # Use the service name from Docker Compose
+        'PORT': '5432',
     }
 }
 
