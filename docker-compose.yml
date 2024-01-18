@@ -1,7 +1,6 @@
 version: '3'
 
 services:
-  # PostgreSQL database service
   db:
     image: postgres:latest
     environment:
@@ -11,17 +10,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # Django application service
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: /app/entrypoint.sh
     volumes:
       - .:/app
     ports:
       - "8000:8000"
     depends_on:
       - db
-    entrypoint: /app/entrypoint.sh
+      - redis
 
   test:
     build: .
@@ -30,6 +28,11 @@ services:
       - .:/app
     depends_on:
       - db
+
+  redis:
+    image: "redis:latest"
+    ports:
+      - "6380:6379"
 
 volumes:
   postgres_data:
