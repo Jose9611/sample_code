@@ -4,8 +4,7 @@ from rest_framework.response import Response
 from django.contrib.auth import authenticate, login
 from rest_framework import status
 from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from .serializers import UserSerializer,UserListSerializer,FriendRequestSerializer,FriendAcceptedlistserializer,FriendPendinglistserializer
+from .serializers import UserSerializer,UserListSerializer,FriendRequestSerializer,FriendAcceptedlistserializer,FriendPendinglistserializer,UserRegistrationSerializer
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
 from .models import CustomUser,FriendRequest
@@ -17,6 +16,8 @@ from project.custom_paginator import CustomPageNumberPagination
 from django.db.models import  Q,Prefetch
 from project.constants import MESSAGES
 from django.utils import timezone
+from django.contrib.auth import authenticate, login
+import jwt
 
 
 
@@ -25,35 +26,31 @@ def login(request):
     email = request.data.get('email')
     password = request.data.get('password')
 
-    # user = authenticate(email=email, password=password)
-    if not CustomUser.objects.filter(email__iexact=email).exists():
+    user = authenticate(email=email, password=password)
+    if not user:
         return Response({'error': 'Email or Password is Incorrect'}, status=400)
-    elif not CustomUser.objects.filter(email__iexact=email,password=password).exists():
-        return Response({'error': 'Invalid password'}, status=400)
+
     else:
-        user = CustomUser.objects.filter(email__iexact=email,password=password).first()
 
-
-
-
-    if user:
         refresh = RefreshToken.for_user(user)
         return Response({
+            'message': 'Login successful',
             'access': str(refresh.access_token),
             'refresh': str(refresh)
         })
+
+
 
 
 @api_view(['POST','GET'])
 @csrf_exempt
 #@permission_classes([IsAuthenticated,])
 def register_user(request):
-    serializer = UserSerializer(data=request.data)
+    serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
         return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
-    else:
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UserSearchAPIView(APIView):
     permission_classes = [IsAuthenticated]
